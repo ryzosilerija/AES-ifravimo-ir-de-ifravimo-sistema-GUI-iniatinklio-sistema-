@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <title>AES šifravimo sistema</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; }
+        textarea { width: 100%; height: 100px; margin-bottom: 10px; }
+        input, select { width: 100%; margin-bottom: 10px; padding: 5px; }
+        button { padding: 10px 20px; margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <h1>AES šifravimo ir dešifravimo sistema</h1>
+
+    <label>Įveskite tekstą:</label>
+    <textarea id="plaintext"></textarea>
+
+    <label>Įveskite slaptą raktą:</label>
+    <input type="text" id="key">
+
+    <label>Šifravimo modas:</label>
+    <select id="mode">
+        <option value="ECB">ECB</option>
+        <option value="CBC">CBC</option>
+        <option value="CFB">CFB</option>
+    </select>
+
+    <label>Rakto ilgis:</label>
+    <select id="keySize">
+        <option value="128">128 bitų</option>
+        <option value="192">192 bitų</option>
+        <option value="256">256 bitų</option>
+    </select>
+
+    <button onclick="encryptText()">Šifruoti</button>
+    <button onclick="decryptText()">Dešifruoti</button>
+
+    <label>Rezultatas:</label>
+    <textarea id="result"></textarea>
+
+    <!-- ✅ CryptoJS biblioteka (nereikia parsisiųsti) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+
+    <!-- ✅ Visa logika čia -->
+    <script>
+        function padKey(key, size) {
+            let keyUtf8 = CryptoJS.enc.Utf8.parse(key);
+            let keyBytes = keyUtf8.clone();
+            let requiredBytes = size / 8;
+
+            while (keyBytes.sigBytes < requiredBytes) {
+                keyBytes.concat(keyUtf8);
+            }
+            keyBytes.sigBytes = requiredBytes;
+            return keyBytes;
+        }
+
+        function encryptText() {
+            const text = document.getElementById('plaintext').value;
+            const keyInput = document.getElementById('key').value;
+            const mode = document.getElementById('mode').value;
+            const keySize = parseInt(document.getElementById('keySize').value);
+
+            if (!keyInput) {
+                alert("Raktas negali būti tuščias!");
+                return;
+            }
+
+            const key = padKey(keyInput, keySize);
+
+            let cipherMode = CryptoJS.mode.ECB;
+            let iv = undefined;
+
+            if (mode === 'CBC') {
+                cipherMode = CryptoJS.mode.CBC;
+                iv = CryptoJS.lib.WordArray.random(16);
+            } else if (mode === 'CFB') {
+                cipherMode = CryptoJS.mode.CFB;
+                iv = CryptoJS.lib.WordArray.random(16);
+            }
+
+            const encrypted = CryptoJS.AES.encrypt(text, key, {
+                mode: cipherMode,
+                iv: iv,
+                padding: CryptoJS.pad.Pkcs7
+            });
+
+            let output = encrypted.toString();
+            if (iv) {
+                output = iv.toString() + ":" + output;
+            }
+
+            document.getElementById('result').value = output;
+        }
+
+        function decryptText() {
+            const cipherText = document.getElementById('result').value;
+            const keyInput = document.getElementById('key').value;
+            const mode = document.getElementById('mode').value;
+            const keySize = parseInt(document.getElementById('keySize').value);
+
+            if (!keyInput) {
+                alert("Raktas negali būti tuščias!");
+                return;
+            }
+
+            const key = padKey(keyInput, keySize);
+
+            let cipherMode = CryptoJS.mode.ECB;
+            let iv = undefined;
+            let encryptedText = cipherText;
+
+            if (mode === 'CBC' || mode === 'CFB') {
+                const parts = cipherText.split(":");
+                iv = CryptoJS.enc.Hex.parse(parts[0]);
+                encryptedText = parts[1];
+                cipherMode = mode === 'CBC' ? CryptoJS.mode.CBC : CryptoJS.mode.CFB;
+            }
+
+            const decrypted = CryptoJS.AES.decrypt(encryptedText, key, {
+                mode: cipherMode,
+                iv: iv,
+                padding: CryptoJS.pad.Pkcs7
+            });
+
+            document.getElementById('result').value =
+                decrypted.toString(CryptoJS.enc.Utf8);
+        }
+    </script>
+</body>
+</html>
